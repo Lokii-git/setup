@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Internal Printer Discovery Script
-# Author: Clearwater
+# Author: Philip Burnham
 # Purpose: Locate printers on the network during an internal penetration test
 
 # Input Variables
