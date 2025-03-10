@@ -1,5 +1,7 @@
 #!/bin/bash
-
+# Horizon AI curl helper
+# Author: Philip Burnham
+# Purpose: Easy copy paste of curl command from Horizon to run docker container.
 echo "[+] Paste your Horizon curl command (right-click to paste in terminal):"
 read -r HORIZON_CURL
 
