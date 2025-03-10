@@ -1,4 +1,7 @@
 #!/bin/bash
+# Internal SNMP Walk with NMAP Scan
+# Author: Philip Burnham
+# Purpose: Uses NMAP to find hosts with udp ports open and walks along community strings
 
 # Define variables
 IPLIST="iplist.txt"
