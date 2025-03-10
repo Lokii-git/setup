@@ -15,6 +15,25 @@ fi
 echo "[+] Extracted URL:"
 echo "$HORIZON_URL"
 
-# Run the command in the correct format
+# Run the command with standard curl options
 echo "[+] Running Horizon script..."
-sudo bash -c "$(curl -fsSL '$HORIZON_URL')"
+sudo bash -c "$(curl -fsSL "$HORIZON_URL")"
+
+# Capture exit status
+EXIT_CODE=$?
+
+# Check for failure
+if [[ $EXIT_CODE -ne 0 ]]; then
+    echo "[!] Initial execution failed. Checking for SSL issues..."
+
+    # Retry with -k if it failed due to SSL issues
+    SSL_ERROR=$(curl -fsSL "$HORIZON_URL" 2>&1 | grep -i "certificate" || true)
+
+    if [[ -n "$SSL_ERROR" ]]; then
+        echo "[!] SSL certificate verification failed. Retrying with -k (insecure mode)..."
+        sudo bash -c "$(curl -fsSLk "$HORIZON_URL")"
+    else
+        echo "[!] Retrying with raw curl command..."
+        curl "$HORIZON_URL" | bash
+    fi
+fi
