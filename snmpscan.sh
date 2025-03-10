@@ -7,6 +7,8 @@ NMAP_OUTPUT="$OUTPUT_DIR/snmp_scan_results.nmap"
 COMMUNITY_LIST="$OUTPUT_DIR/community_strings.txt"
 SNMP_PORT=161
 SNMP_VERSION="1"
+PRIPS_SCRIPT="prips.sh"
+PRIPS_URL="https://raw.githubusercontent.com/honzahommer/prips.sh/main/prips.sh"
 
 # Default SNMP community string wordlist
 DEFAULT_COMMUNITIES=(
@@ -27,30 +29,27 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Function to install prips if not installed
-install_prips() {
-    if ! command -v prips >/dev/null 2>&1; then
-        echo "prips is not installed. Installing..."
-        apt-get update && apt-get install -y prips
-        if ! command -v prips >/dev/null 2>&1; then
-            echo "Error: Failed to install prips. Exiting." >&2
-            exit 1
-        fi
+# Function to download prips.sh if not available
+download_prips() {
+    if [[ ! -f "$PRIPS_SCRIPT" ]]; then
+        echo "Downloading prips.sh from GitHub..."
+        curl -fsSL "$PRIPS_URL" -o "$PRIPS_SCRIPT"
+        chmod +x "$PRIPS_SCRIPT"
     fi
 }
 
-# Function to expand CIDR ranges to IPs
+# Function to expand CIDR ranges to IPs using prips.sh
 expand_cidr() {
     local input_file="$1"
     local output_file="$2"
 
-    echo "Expanding CIDR ranges to individual IPs..."
+    echo "Expanding CIDR ranges to individual IPs using prips.sh..."
     > "$output_file"  # Clear any existing file
 
     while read -r line; do
         if [[ "$line" == *"/"* ]]; then
-            # CIDR range detected, expand it
-            prips "$line" >> "$output_file"
+            # CIDR range detected, expand it using prips.sh
+            ./$PRIPS_SCRIPT "$line" >> "$output_file"
         else
             # Single IP, add it directly
             echo "$line" >> "$output_file"
@@ -63,8 +62,8 @@ expand_cidr() {
 # Create results directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 
-# Step 1: Ensure prips is installed
-install_prips
+# Step 1: Download prips.sh if not available
+download_prips
 
 # Step 2: Generate the community strings wordlist
 echo "Generating SNMP community string wordlist..."
