@@ -1,3 +1,6 @@
+# Internal SMB Enmumerator
+# Author: Philip Burnham
+# Purpose: Attempts to find potential SMB shares
 import re
 import subprocess
 import os
