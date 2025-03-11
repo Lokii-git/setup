@@ -4,14 +4,10 @@
 # Purpose: Extracts useful findings for easy review
 
 import os
-import re
 
 # Define directories and output file
 RESULTS_DIR = "http_login_results"
 OUTPUT_FILE = "http_login_summary.txt"
-
-# Regex to match login findings
-LOGIN_PATTERN = re.compile(r"\[\s*(.*?)\s*\].*?at (.*?)\n\|\s+(.*)")
 
 def parse_results():
     """Parses result files and extracts login details."""
@@ -22,13 +18,20 @@ def parse_results():
             if file.endswith(".txt"):
                 file_path = os.path.join(root, file)
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
-                    matches = LOGIN_PATTERN.findall(content)
+                    lines = f.readlines()
                     
-                    for match in matches:
-                        service, path, creds = match
-                        ip_port = file.replace("_http_login_results.txt", "").replace("_", ":")
-                        findings.append(f"{ip_port} - {service} at {path} -> {creds}")
+                    # If the file has only one line, skip it (no credentials found)
+                    if len(lines) < 2:
+                        continue
+                    
+                    ip_port = file.replace("_http_login_results.txt", "").replace("_", ":")
+                    findings.append(f"{ip_port} - Credentials Found:")
+
+                    # Extract login details (all lines except the first)
+                    for line in lines[1:]:  
+                        clean_line = line.strip()
+                        if clean_line:  # Ignore empty lines
+                            findings.append(f"  {clean_line}")
 
     return findings
 
