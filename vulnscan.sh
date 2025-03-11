@@ -1,4 +1,7 @@
 #!/bin/bash
+# Eternal Blue Scanner
+# Author: Philip Burnham
+# Purpose: Uses metasploit to run vulnerability scans against each IP, automating the process.
 
 # Ensure the script is run with root privileges
 if [ "$EUID" -ne 0 ]; then
