@@ -1,4 +1,7 @@
 #!/bin/bash
+# Internal AD Scan
+# Author: Philip Burnham
+# Purpose: Ran after ad_enum_scan.sh to do a deeper dive for usernames
 
 IP_LIST="ad_file_servers.txt"
 OUTPUT_DIR="enum4linux_results_usernames"
