@@ -6,8 +6,8 @@
 import os
 
 # Define directories and output file
-RESULTS_DIR = "http_login_results"
-OUTPUT_FILE = "http_login_summary.txt"
+RESULTS_DIR = "loginhunter_results"
+OUTPUT_FILE = "loginhunter_summary.txt"
 
 def parse_results():
     """Parses result files and extracts login details."""
@@ -20,15 +20,20 @@ def parse_results():
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
                     
-                    # Skip files with only one line (no credentials found)
+                    # Ignore files with only one line (no credentials found)
                     if len(lines) < 2:
                         continue
                     
                     # Extract IP:Port from filename
                     ip_port = file.replace("_http_login_results.txt", "").replace("_", ":")
                     
-                    # Check if there's credential data (lines after the first one)
-                    creds_found = [line.strip() for line in lines[1:] if line.strip()]
+                    # Collect non-empty lines after the first one
+                    creds_found = []
+                    for line in lines[1:]:  # Skip first line
+                        clean_line = line.strip()
+                        if clean_line:  # Ignore empty lines
+                            creds_found.append(clean_line)
+
                     if creds_found:
                         findings.append(f"{ip_port} - Credentials Found:")
                         findings.extend([f"  {cred}" for cred in creds_found])
