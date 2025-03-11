@@ -1,3 +1,8 @@
+# Enumerates testssl findings
+# Author: Philip Burnham
+# Purpose: Ran after runtestssl.sh, sorts findings by type for easier documentation and review
+
+
 import os
 import re
 import shutil
