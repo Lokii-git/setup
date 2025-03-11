@@ -1,4 +1,7 @@
 #!/bin/bash
+# Internal AD Scan
+# Author: Philip Burnham
+# Purpose: NMAP for potential targets that could be running AD, runs enum4linux on each host
 
 # Define variables
 INPUT_FILE="iplist.txt"             # Input file containing a list of IPs or subnets to scan
