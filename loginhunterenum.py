@@ -20,18 +20,18 @@ def parse_results():
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
                     
-                    # If the file has only one line, skip it (no credentials found)
+                    # Skip files with only one line (no credentials found)
                     if len(lines) < 2:
                         continue
                     
+                    # Extract IP:Port from filename
                     ip_port = file.replace("_http_login_results.txt", "").replace("_", ":")
-                    findings.append(f"{ip_port} - Credentials Found:")
-
-                    # Extract login details (all lines except the first)
-                    for line in lines[1:]:  
-                        clean_line = line.strip()
-                        if clean_line:  # Ignore empty lines
-                            findings.append(f"  {clean_line}")
+                    
+                    # Check if there's credential data (lines after the first one)
+                    creds_found = [line.strip() for line in lines[1:] if line.strip()]
+                    if creds_found:
+                        findings.append(f"{ip_port} - Credentials Found:")
+                        findings.extend([f"  {cred}" for cred in creds_found])
 
     return findings
 
