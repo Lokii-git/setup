@@ -1,4 +1,7 @@
 #!/bin/bash
+# Test SSL on iplist.txt
+# Author: Philip Burnham
+# Purpose: NMAP scan of alive hosts, and runs testssl.sh against each IP.
 
 # Variables
 RESULTS_DIR="testssl_results"
