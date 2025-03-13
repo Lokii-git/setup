@@ -1,82 +1,119 @@
 #!/bin/bash
 
-# Internal Printer Discovery Script
+# Enhanced Internal Printer Discovery Script
 # Author: Philip Burnham
-# Purpose: Locate printers on the network during an internal penetration test
+# Purpose: Locate and enumerate printers on internal network
 
 # Input Variables
-IP_LIST="iplist.txt"   # Text file with IP ranges
+IP_LIST="iplist.txt"
 OUTPUT_DIR="printer_results"
-LOG_FILE="$OUTPUT_DIR/printer_scan_$(date +%F).log"
+LOG_FILE="$OUTPUT_DIR/printer_scan_$(date +%Y-%m-%d).log"
 
-# Ensure Output Directory Exists
+# Ensure output directory exists
 mkdir -p "$OUTPUT_DIR"
 
-# Function to clean carriage return characters from input file
-clean_input_file() {
-    echo "[+] Cleaning input file to remove carriage returns..."
-    sed -i 's/\r//g' "$IP_LIST"
+# Install missing tools
+install_tools() {
+    declare -A tools=(
+        ["nmap"]="nmap"
+        ["snmpwalk"]="snmp"
+        ["snmp-mibs-downloader"]="snmp-mibs-downloader"
+        ["parallel"]="parallel"
+        ["nc"]="netcat"
+        ["unzip"]="unzip"
+        ["httpx"]="httpx"
+        ["aquatone"]="aquatone"
+    )
+
+    for tool in "${!tools[@]}"; do
+        if ! command -v "$tool" &>/dev/null; then
+            echo "[!] $tool not found, installing..."
+            if [[ "$tool" == "httpx" ]]; then
+                sudo apt update && sudo apt install -y httpx-toolkit
+            elif [[ "$tool" == "aquatone" ]]; then
+                wget "https://github.com/michenriksen/aquatone/releases/download/v1.7.0/aquatone_linux_amd64_1.7.0.zip" -O /tmp/aquatone.zip
+                unzip /tmp/aquatone.zip -d /tmp/aquatone-bin
+                sudo mv /tmp/aquatone/aquatone /usr/local/bin/aquatone
+                sudo chmod +x /usr/local/bin/aquatone
+                rm -rf /tmp/aquatone*
+            else
+                sudo apt update && sudo apt install -y "${tools[$tool]}"
+            fi
+        fi
+    done
 }
 
-# Function to scan for port 9100 (JetDirect)
-scan_port9100() {
-    echo "[+] Scanning for port 9100 (JetDirect printers)..."
-    while read -r IP_RANGE; do
-        CLEAN_RANGE=$(echo "$IP_RANGE" | sed 's/\r//g')
-        echo "    [-] Scanning range: $CLEAN_RANGE"
-        OUTPUT_FILE="$OUTPUT_DIR/port9100_scan_${CLEAN_RANGE//\//_}.txt"
-        nmap -sV -p 9100 --open "$CLEAN_RANGE" -oG "$OUTPUT_FILE"
-        cat "$OUTPUT_FILE" | grep Ports | awk '{print $2}' >> "$OUTPUT_DIR/port9100_hosts.txt"
+# Sanitize IP list
+clean_ip_list() {
+    sed -i '/^$/d;s/ //g' "$IP_LIST"
+}
+
+# Scan common printer ports
+scan_printer_ports() {
+    echo "[+] Scanning common printer ports..."
+    PRINTER_PORTS="80,443,161,515,631,8080,5357,8000,9100-9103"
+    while read -r range; do
+        safe_range=$(echo "$range" | sed 's/[\/]/_/g')
+        nmap -sV --open -p "$PRINTER_PORTS" "$range" -oG "$OUTPUT_DIR/${safe_range}_printer_ports.gnmap" &
     done < "$IP_LIST"
-    echo "[+] Port 9100 results saved to: $OUTPUT_DIR/port9100_hosts.txt"
+    wait
+    grep "Ports" "$OUTPUT_DIR"/*.gnmap | awk '{print $2}' | sort -u > "$OUTPUT_DIR/printer_hosts.txt"
 }
 
-# Function to discover printers using SNMP
-scan_snmp_printers() {
-    echo "[+] Scanning for SNMP printers..."
+# Banner grabbing on port 9100
+grab_jetdirect_banners() {
     while read -r host; do
-        echo "    [-] Querying $host via SNMP..."
-        snmpwalk -v2c -c public "$host" 1.3.6.1.2.1.43 2>/dev/null | grep "prtMarker" >> "$OUTPUT_DIR/snmp_printers.log"
+        timeout 5 bash -c "echo | nc -vn $host 9100" &>> "$OUTPUT_DIR/jetdirect_banners.txt" &
     done < "$OUTPUT_DIR/port9100_hosts.txt"
-    echo "[+] SNMP results saved to: $OUTPUT_DIR/snmp_printers.log"
+    wait
 }
 
-# Function to identify HTTP-based printer interfaces
-scan_http_printers() {
-    echo "[+] Scanning for HTTP-based printer interfaces..."
-    while read -r IP_RANGE; do
-        CLEAN_RANGE=$(echo "$IP_RANGE" | sed 's/\r//g')
-        echo "    [-] Scanning range: $CLEAN_RANGE"
-        OUTPUT_FILE="$OUTPUT_DIR/http_printer_scan_${CLEAN_RANGE//\//_}.txt"
-        nmap -sV -p 80,443,8080 --open "$CLEAN_RANGE" -oG "$OUTPUT_FILE"
-        cat "$OUTPUT_FILE" | grep Ports | awk '{print $2, $4}' | grep -E "(80|443|8080)/open" >> "$OUTPUT_DIR/http_printer_hosts.txt"
-    done < "$IP_LIST"
-    echo "[+] HTTP printer results saved to: $OUTPUT_DIR/http_printer_hosts.txt"
+# SNMP Enumeration
+snmp_enumeration() {
+    local COMMUNITIES=("public" "private" "community" "printers" "read")
+    while read -r HOST; do
+        for COMM in "${COMMUNITIES[@]}"; do
+            snmpwalk -v2c -c "$COMM" "$HOST" 1.3.6.1.2.1.43 &>> "$OUTPUT_DIR/snmp_printers.log" &
+        done
+    done < "$OUTPUT_DIR/port9100_hosts.txt"
+    wait
 }
 
-# Function to summarize findings
+# HTTP Title Grabbing
+http_title_grabbing() {
+    httpx -l "$OUTPUT_DIR/printer_hosts.txt" -title -status-code -o "$OUTPUT_DIR/http_printer_titles.txt"
+}
+
+# Aquatone screenshots
+aquatone_screenshots() {
+    cat "$OUTPUT_DIR/printer_hosts.txt" | aquatone -out "$OUTPUT_DIR/aquatone_results"
+}
+
+# Summarize results
 summarize_results() {
-    echo "[+] Generating printer summary..."
     echo "--- Printer Discovery Summary ---" > "$LOG_FILE"
-    echo "\nPort 9100 Printers:" >> "$LOG_FILE"
-    cat "$OUTPUT_DIR/port9100_hosts.txt" >> "$LOG_FILE"
-    echo "\nSNMP Discovered Printers:" >> "$LOG_FILE"
+    echo -e "\n--- Discovered Printer IPs ---" >> "$LOG_FILE"
+    cat "$OUTPUT_DIR/printer_hosts.txt" >> "$LOG_FILE"
+    echo -e "\n--- SNMP Printer Results ---" >> "$LOG_FILE"
     cat "$OUTPUT_DIR/snmp_printers.log" >> "$LOG_FILE"
-    echo "\nHTTP Interfaces (Potential Printers):" >> "$LOG_FILE"
-    cat "$OUTPUT_DIR/http_printer_hosts.txt" >> "$LOG_FILE"
+    echo -e "\n--- HTTP Printer Hosts ---" >> "$LOG_FILE"
+    cat "$OUTPUT_DIR/http_printer_titles.txt" >> "$LOG_FILE"
     echo "[+] Summary written to: $LOG_FILE"
 }
 
 # Main Execution
 if [ ! -f "$IP_LIST" ]; then
-    echo "Error: IP list file '$IP_LIST' not found."
-    exit 1
+    echo "IP list file ($IP_LIST) missing!"; exit 1
 fi
 
-clean_input_file
-scan_port9100
-scan_snmp_printers
-scan_http_printers
+install_tools
+clean_ip_list
+scan_printer_ports
+grep -rl '9100/open' "$OUTPUT_DIR"/*.gnmap | xargs -I{} grep "Ports" {} | awk '{print $2}' > "$OUTPUT_DIR/port9100_hosts.txt"
+grab_jetdirect_banners
+snmp_enumeration
+http_title_grabbing
+aquatone_screenshots
 summarize_results
 
-echo "[+] Printer Discovery Complete. Check logs in: $OUTPUT_DIR"
+echo "[+] Printer discovery completed. Results saved in $OUTPUT_DIR."
